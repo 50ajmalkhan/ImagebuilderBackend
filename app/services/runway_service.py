@@ -112,7 +112,7 @@ class RunwayMLService:
                 public_url = admin_supabase.storage.from_(settings.STORAGE_BUCKET).get_public_url(file_name)
                 
                 # Log generation
-                print("Logging generation...")
+                print("Logging generation...", public_url)
                 generation_id = str(uuid.uuid4())
                 log_data = {
                     "id": generation_id,
@@ -130,11 +130,7 @@ class RunwayMLService:
                 except Exception as e:
                     print(f"Warning: Failed to log generation: {str(e)}")
                 
-                return {
-                    "video_url": public_url,
-                    "status": "success",
-                    "task_id": task_id
-                }
+                return public_url
                 
             except Exception as e:
                 print(f"Error during video generation: {str(e)}")
