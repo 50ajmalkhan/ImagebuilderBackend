@@ -1,7 +1,15 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from typing import List, Union
+import json
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="allow"
+    )
+    
     PROJECT_NAME: str = "AI Image/Video Generation API"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
@@ -24,14 +32,11 @@ class Settings(BaseSettings):
     
     # Database settings
     DB_HOST: str
-    DB_PORT: str = "5432"
+    DB_PORT: Union[str, int] = "6543"
     DB_USER: str
     DB_PASSWORD: str
     DB_NAME: str
 
-    class Config:
-        env_file = ".env"
-
 @lru_cache()
-def get_settings():
+def get_settings() -> Settings:
     return Settings() 

@@ -8,7 +8,7 @@ from app.services.dalle_service import generate_image
 from app.services.runway_service import runway_service
 from app.core.dependencies import get_current_user
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi.openapi.models import Response
 from fastapi import Body
 from supabase import create_client
@@ -66,16 +66,28 @@ async def create_video(
     "/history",
     response_model=List[GenerationLog],
     summary="Get generation history",
-    description="Retrieve the history of all your image and video generations",
+    description="Retrieve the history of all your image and video generations. Use the 'type' parameter to filter by content type (image/video)",
     response_description="List of all generations ordered by creation date"
 )
-async def get_generation_history(current_user: dict = Depends(get_current_user)):
+async def get_generation_history(
+    current_user: dict = Depends(get_current_user),
+    type: Optional[str] = None
+):
     try:
-        response = admin_supabase.table("generations")\
+        query = admin_supabase.table("generations")\
             .select("*")\
-            .eq("user_id", current_user.id)\
-            .order("created_at", desc=True)\
-            .execute()
+            .eq("user_id", current_user.id)
+        
+        # Add type filter if specified
+        if type:
+            if type not in ["image", "video"]:
+                raise HTTPException(status_code=400, detail="Type must be either 'image' or 'video'")
+            query = query.eq("type", type)
+        
+        # Execute query with ordering
+        response = query.order("created_at", desc=True).execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 
