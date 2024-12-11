@@ -11,6 +11,7 @@ from fastapi import UploadFile, HTTPException
 import json
 import asyncio
 from typing import Optional
+import requests
 
 settings = get_settings()
 
@@ -58,10 +59,10 @@ class RunwayMLService:
             try:
                 print("Creating image-to-video task...")
                 # Create a new image-to-video task
-                task = await self.client.image_to_video.create(
+                task = self.client.image_to_video.create(
                     model='gen3a_turbo',
-                    input_image=image_data_uri,
-                    prompt=prompt
+                    prompt_image=image_data_uri,
+                    prompt_text=prompt
                 )
                 
                 task_id = task.id
@@ -73,7 +74,7 @@ class RunwayMLService:
                     # Wait for ten seconds before polling
                     await asyncio.sleep(10)
                     
-                    task = await self.client.tasks.retrieve(task_id)
+                    task = self.client.tasks.retrieve(task_id)
                     print(f"Task status: {task.status}")
                     
                     if task.status == 'FAILED':
@@ -84,15 +85,15 @@ class RunwayMLService:
                 print(f"Task completed successfully: {task}")
                 
                 # Get video URL from task output
-                video_url = task.output.get('video_url')
-                if not video_url:
+                if not task.output or not task.output[0]:
                     raise HTTPException(status_code=500, detail="No video URL in task result")
                 
+                video_url = task.output[0]  # Get first URL from the list
                 print(f"Video URL from Runway: {video_url}")
                 
                 # Download video
                 print("Downloading video...")
-                video_response = await self.client.http.get(video_url)
+                video_response = requests.get(video_url)
                 if video_response.status_code != 200:
                     raise HTTPException(status_code=500, detail="Failed to download generated video")
                 
