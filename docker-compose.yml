@@ -7,8 +7,6 @@ services:
       dockerfile: Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
-      cache_from:
-        - type=registry,ref=localhost:5000/api:buildcache
     image: api:latest
     ports:
       - "8000:8000"
@@ -18,12 +16,6 @@ services:
       - ./app:/app/app
       - ./logs:/app/logs
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
     deploy:
       resources:
         limits:
