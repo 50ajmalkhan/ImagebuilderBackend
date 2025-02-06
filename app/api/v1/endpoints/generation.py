@@ -1,20 +1,20 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from sqlalchemy.orm import Session
+from typing import List, Dict, Optional
+from app.core.dependencies import get_current_user, get_db
+from app.models.user import User
+from app.models.generation import Generation, GenerationType
+from app.services.dalle_service import generate_image
+from app.services.runway_service import runway_service
+from app.services.storage_service import storage_service
 from app.schemas.generation import (
     ImageGenerationRequest,
     GenerationResponse,
     GenerationLog
 )
-from app.services.dalle_service import generate_image
-from app.services.runway_service import runway_service
-from app.core.dependencies import get_current_user
 from datetime import datetime
-from typing import List, Optional
-from fastapi.openapi.models import Response
-from fastapi import Body
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.models.generation import Generation, GenerationType
 from app.core.config import get_settings
+import os
 
 settings = get_settings()
 router = APIRouter()
@@ -22,16 +22,18 @@ router = APIRouter()
 @router.post("/generate-image", response_model=GenerationResponse)
 async def create_image(
     request: ImageGenerationRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Generate an image using DALL-E model.
     """
     try:
-        image_url = await generate_image(request.prompt, current_user.id, db)
+        file_path = await generate_image(request.prompt, current_user.id, db)
+        # Get filename from path for content disposition
+        filename = os.path.basename(file_path)
         return {
-            "url": image_url,
+            "url": storage_service.get_signed_url(file_path, display_name=filename),
             "status": "success",
             "generated_at": datetime.now()
         }
@@ -47,18 +49,20 @@ async def create_image(
 async def create_video(
     prompt: str = Form(..., description=""),
     reference_image: UploadFile = File(..., description=""),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
-        video_url = await runway_service.generate_video(
+        file_path = await runway_service.generate_video(
             prompt,
             current_user.id,
             reference_image,
             db
         )
+        # Get filename from path for content disposition
+        filename = os.path.basename(file_path)
         return {
-            "url": video_url,
+            "url": storage_service.get_signed_url(file_path, display_name=filename),
             "status": "success",
             "generated_at": datetime.now()
         }
@@ -69,11 +73,10 @@ async def create_video(
     "/history",
     response_model=List[GenerationLog],
     summary="Get generation history",
-    description="Retrieve the history of all your image and video generations. Use the 'type' parameter to filter by content type (image/video)",
-    response_description="List of all generations ordered by creation date"
+    description="Retrieve the history of all your image and video generations"
 )
 async def get_generation_history(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
@@ -88,6 +91,18 @@ async def get_generation_history(
         
         # Execute query with ordering
         generations = query.order_by(Generation.created_at.desc()).all()
+        
+        # Generate signed URLs for all media
+        for gen in generations:
+            filename = os.path.basename(gen.url)
+            gen.url = storage_service.get_signed_url(gen.url, display_name=filename)
+            if gen.reference_image_url:
+                ref_filename = os.path.basename(gen.reference_image_url)
+                gen.reference_image_url = storage_service.get_signed_url(
+                    gen.reference_image_url,
+                    display_name=ref_filename
+                )
+        
         return generations
     except HTTPException:
         raise

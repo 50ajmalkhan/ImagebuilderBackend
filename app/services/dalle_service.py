@@ -5,7 +5,10 @@ from datetime import datetime
 import uuid
 from sqlalchemy.orm import Session
 from app.models.generation import Generation, GenerationType
-from app.db.session import s3_client
+from app.services.storage_service import storage_service
+from app.services.token_history import token_history_service, TokenActionType
+from app.models.user import User
+from fastapi import HTTPException
 
 settings = get_settings()
 print(f"Initializing OpenAI client with key: {settings.AI_MODEL_KEY[:8]}...")
@@ -13,6 +16,15 @@ client = OpenAI(api_key=settings.AI_MODEL_KEY)
 
 async def generate_image(prompt: str, user_id: int, db: Session):
     try:
+        # Check if user has enough tokens
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        required_tokens = 15  # Cost for image generation
+        if user.tokens < required_tokens:
+            raise HTTPException(status_code=400, detail="Insufficient tokens")
+
         print(f"Attempting to generate image with prompt: {prompt}")
         # Generate image using DALL-E
         response = client.images.generate(
@@ -32,19 +44,16 @@ async def generate_image(prompt: str, user_id: int, db: Session):
             image_response = requests.get(image_url)
             image_data = image_response.content
             
-            # Upload to S3
-            file_name = f"generated/{user_id}/{datetime.now().timestamp()}.png"
-            s3_client.put_object(
-                Bucket=settings.S3_BUCKET_NAME,
-                Key=file_name,
-                Body=image_data,
-                ContentType="image/png"
-            )
-            print(f"File uploaded to S3: {file_name}")
+            # Generate file path
+            file_path = f"generated/{user_id}/{datetime.now().timestamp()}.png"
             
-            # Get public URL
-            public_url = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{file_name}"
-            print(f"Public URL: {public_url}")
+            # Upload to storage
+            storage_url = storage_service.upload_file(
+                file_data=image_data,
+                file_path=file_path,
+                content_type="image/png"
+            )
+            print(f"File uploaded: {file_path}")
             
             try:
                 # Log generation to database
@@ -53,23 +62,37 @@ async def generate_image(prompt: str, user_id: int, db: Session):
                     user_id=user_id,
                     prompt=prompt,
                     type=GenerationType.IMAGE,
-                    url=public_url,
+                    url=file_path,
                     status="success"
                 )
                 db.add(generation)
-                db.commit()
                 
-                return public_url
+                # Deduct tokens and log token history
+                user.tokens -= required_tokens
+                token_history_service.create_token_history(
+                    db=db,
+                    user_id=user_id,
+                    tokens=-required_tokens,  # Negative value for consumption
+                    action_type=TokenActionType.CONSUMED,
+                    description="Image generation",
+                    extra_data={"prompt": prompt},
+                    generation_url=file_path
+                )
+                
+                db.commit()
+                return file_path
+                
             except Exception as log_error:
                 print(f"Error logging generation: {str(log_error)}")
                 db.rollback()
-                # Even if logging fails, return the URL if we have it
-                return public_url
+                raise Exception(f"Failed to log generation: {str(log_error)}")
                 
         except Exception as storage_error:
             print(f"Error in storage operations: {str(storage_error)}")
             raise Exception(f"Failed to store generated image: {str(storage_error)}")
             
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in generate_image: {str(e)}")
         raise Exception(f"Failed to generate image: {str(e)}") 

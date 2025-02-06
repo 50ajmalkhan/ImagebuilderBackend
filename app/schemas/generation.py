@@ -1,12 +1,14 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 class ImageGenerationRequest(BaseModel):
     prompt: str = Field(
         ...,
         description="Text description of the image you want to generate",
-        example="A beautiful sunset over a mountain lake"
+        example="A beautiful sunset over a mountain lake",
+        min_length=1
     )
 
 class GenerationResponse(BaseModel):
@@ -26,12 +28,12 @@ class GenerationResponse(BaseModel):
     )
 
 class GenerationLog(BaseModel):
-    id: str = Field(
+    id: UUID = Field(
         ...,
         description="Unique identifier for the generation",
         example="123e4567-e89b-12d3-a456-426614174000"
     )
-    user_id: str = Field(
+    user_id: int = Field(
         ...,
         description="ID of the user who created this generation",
         example="user123"
@@ -68,4 +70,7 @@ class GenerationLog(BaseModel):
     updated_at: datetime = Field(
         ...,
         description="Timestamp when the record was last updated"
-    ) 
+    )
+
+    class Config:
+        from_attributes = True 

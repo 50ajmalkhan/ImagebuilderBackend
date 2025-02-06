@@ -14,6 +14,8 @@ import requests
 from sqlalchemy.orm import Session
 from app.models.generation import Generation, GenerationType
 from app.db.session import s3_client
+from app.models.user import User
+from app.services.token_history import token_history_service, TokenActionType
 
 settings = get_settings()
 
@@ -37,6 +39,15 @@ class RunwayMLService:
     ):
         """Generate video from image and prompt."""
         try:
+            # Check if user has enough tokens
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            required_tokens = 35 # Cost for video generation
+            if user.tokens < required_tokens:
+                raise HTTPException(status_code=400, detail="Insufficient tokens")
+
             if not reference_image:
                 raise HTTPException(status_code=400, detail="Reference image is required")
             
@@ -111,26 +122,37 @@ class RunwayMLService:
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"Failed to upload video: {str(e)}")
                 
-                public_url = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{file_name}"
-                
                 # Log generation to database
-                print("Logging generation...", public_url)
+                print("Logging generation...", file_name)
                 try:
                     generation = Generation(
                         id=uuid.uuid4(),
                         user_id=user_id,
                         prompt=prompt,
                         type=GenerationType.VIDEO,
-                        url=public_url,
+                        url=file_name,
                         status="success"
                     )
                     db.add(generation)
+
+                    # Deduct tokens and log token history
+                    user.tokens -= required_tokens
+                    token_history_service.create_token_history(
+                        db=db,
+                        user_id=user_id,
+                        tokens=-required_tokens,  # Negative value for consumption
+                        action_type=TokenActionType.CONSUMED,
+                        description="Video generation",
+                        extra_data={"prompt": prompt},
+                        generation_url=file_name
+                    )
+                    
                     db.commit()
                 except Exception as e:
                     print(f"Warning: Failed to log generation: {str(e)}")
                     db.rollback()
                 
-                return public_url
+                return file_name
                 
             except Exception as e:
                 print(f"Error during video generation: {str(e)}")
