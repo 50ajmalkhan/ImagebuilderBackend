@@ -23,7 +23,10 @@ async def generate_image(prompt: str, user_id: int, db: Session):
         
         required_tokens = 15  # Cost for image generation
         if user.tokens < required_tokens:
-            raise HTTPException(status_code=400, detail="Insufficient tokens")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient tokens. You need {required_tokens} tokens to generate an image, but you only have {user.tokens} tokens."
+            )
 
         print(f"Attempting to generate image with prompt: {prompt}")
         # Generate image using DALL-E

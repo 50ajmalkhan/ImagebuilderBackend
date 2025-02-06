@@ -44,9 +44,12 @@ class RunwayMLService:
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            required_tokens = 35 # Cost for video generation
+            required_tokens = 35  # Cost for video generation
             if user.tokens < required_tokens:
-                raise HTTPException(status_code=400, detail="Insufficient tokens")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient tokens. You need {required_tokens} tokens to generate a video, but you only have {user.tokens} tokens."
+                )
 
             if not reference_image:
                 raise HTTPException(status_code=400, detail="Reference image is required")

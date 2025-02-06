@@ -37,6 +37,11 @@ async def create_image(
             "status": "success",
             "generated_at": datetime.now()
         }
+    
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions with their original status code and detail
+        raise http_error
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -66,6 +71,9 @@ async def create_video(
             "status": "success",
             "generated_at": datetime.now()
         }
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions with their original status code and detail
+        raise http_error
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
