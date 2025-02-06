@@ -11,24 +11,25 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi.openapi.models import Response
 from fastapi import Body
-from supabase import create_client
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.models.generation import Generation, GenerationType
 from app.core.config import get_settings
 
 settings = get_settings()
-admin_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
 router = APIRouter()
 
 @router.post("/generate-image", response_model=GenerationResponse)
 async def create_image(
     request: ImageGenerationRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Generate an image using DALL-E model.
     """
     try:
-        image_url = await generate_image(request.prompt, current_user.id)
+        image_url = await generate_image(request.prompt, current_user.id, db)
         return {
             "url": image_url,
             "status": "success",
@@ -46,13 +47,15 @@ async def create_image(
 async def create_video(
     prompt: str = Form(..., description=""),
     reference_image: UploadFile = File(..., description=""),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
         video_url = await runway_service.generate_video(
             prompt,
             current_user.id,
-            reference_image
+            reference_image,
+            db
         )
         return {
             "url": video_url,
@@ -71,22 +74,21 @@ async def create_video(
 )
 async def get_generation_history(
     current_user: dict = Depends(get_current_user),
-    type: Optional[str] = None
+    type: Optional[str] = None,
+    db: Session = Depends(get_db)
 ):
     try:
-        query = admin_supabase.table("generations")\
-            .select("*")\
-            .eq("user_id", current_user.id)
+        query = db.query(Generation).filter(Generation.user_id == current_user.id)
         
         # Add type filter if specified
         if type:
             if type not in ["image", "video"]:
                 raise HTTPException(status_code=400, detail="Type must be either 'image' or 'video'")
-            query = query.eq("type", type)
+            query = query.filter(Generation.type == type)
         
         # Execute query with ordering
-        response = query.order("created_at", desc=True).execute()
-        return response.data
+        generations = query.order_by(Generation.created_at.desc()).all()
+        return generations
     except HTTPException:
         raise
     except Exception as e:

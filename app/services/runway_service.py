@@ -4,7 +4,6 @@ import time
 from runwayml import RunwayML
 from app.core.config import get_settings
 from datetime import datetime
-from supabase import create_client
 import uuid
 import aiofiles
 from fastapi import UploadFile, HTTPException
@@ -12,11 +11,11 @@ import json
 import asyncio
 from typing import Optional
 import requests
+from sqlalchemy.orm import Session
+from app.models.generation import Generation, GenerationType
+from app.db.session import s3_client
 
 settings = get_settings()
-
-# Create admin client for storage operations
-admin_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 class RunwayMLService:
     def __init__(self):
@@ -30,8 +29,9 @@ class RunwayMLService:
     async def generate_video(
         self, 
         prompt: str, 
-        user_id: str, 
+        user_id: int, 
         reference_image: Optional[UploadFile] = None,
+        db: Session = None,
         duration: int = 4,
         fps: int = 30
     ):
@@ -97,38 +97,38 @@ class RunwayMLService:
                 if video_response.status_code != 200:
                     raise HTTPException(status_code=500, detail="Failed to download generated video")
                 
-                # Upload to Supabase
-                print("Uploading video to Supabase...")
+                # Upload to S3
+                print("Uploading video to S3...")
                 file_name = f"generated/{user_id}/{datetime.now().timestamp()}.mp4"
                 try:
-                    storage_response = admin_supabase.storage.from_(settings.STORAGE_BUCKET).upload(
-                        file_name,
-                        video_response.content
+                    s3_client.put_object(
+                        Bucket=settings.S3_BUCKET_NAME,
+                        Key=file_name,
+                        Body=video_response.content,
+                        ContentType="video/mp4"
                     )
-                    print(f"Video upload response: {storage_response}")
+                    print(f"File uploaded to S3: {file_name}")
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"Failed to upload video: {str(e)}")
                 
-                public_url = admin_supabase.storage.from_(settings.STORAGE_BUCKET).get_public_url(file_name)
+                public_url = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{file_name}"
                 
-                # Log generation
+                # Log generation to database
                 print("Logging generation...", public_url)
-                generation_id = str(uuid.uuid4())
-                log_data = {
-                    "id": generation_id,
-                    "user_id": user_id,
-                    "prompt": prompt,
-                    "type": "video",
-                    "url": public_url,
-                    "status": "success",
-                    "created_at": datetime.now().isoformat(),
-                    "updated_at": datetime.now().isoformat()
-                }
-                
                 try:
-                    admin_supabase.table("generations").insert(log_data).execute()
+                    generation = Generation(
+                        id=uuid.uuid4(),
+                        user_id=user_id,
+                        prompt=prompt,
+                        type=GenerationType.VIDEO,
+                        url=public_url,
+                        status="success"
+                    )
+                    db.add(generation)
+                    db.commit()
                 except Exception as e:
                     print(f"Warning: Failed to log generation: {str(e)}")
+                    db.rollback()
                 
                 return public_url
                 

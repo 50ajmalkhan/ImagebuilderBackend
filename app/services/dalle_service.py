@@ -2,17 +2,16 @@ from openai import OpenAI
 from app.core.config import get_settings
 import requests
 from datetime import datetime
-from supabase import create_client
 import uuid
+from sqlalchemy.orm import Session
+from app.models.generation import Generation, GenerationType
+from app.db.session import s3_client
 
 settings = get_settings()
 print(f"Initializing OpenAI client with key: {settings.AI_MODEL_KEY[:8]}...")
 client = OpenAI(api_key=settings.AI_MODEL_KEY)
 
-# Create admin client for storage operations
-admin_supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-async def generate_image(prompt: str, user_id: str):
+async def generate_image(prompt: str, user_id: int, db: Session):
     try:
         print(f"Attempting to generate image with prompt: {prompt}")
         # Generate image using DALL-E
@@ -33,39 +32,37 @@ async def generate_image(prompt: str, user_id: str):
             image_response = requests.get(image_url)
             image_data = image_response.content
             
-            # Upload to Supabase storage using admin client
+            # Upload to S3
             file_name = f"generated/{user_id}/{datetime.now().timestamp()}.png"
-            storage_response = admin_supabase.storage.from_(settings.STORAGE_BUCKET).upload(
-                file_name,
-                image_data
+            s3_client.put_object(
+                Bucket=settings.S3_BUCKET_NAME,
+                Key=file_name,
+                Body=image_data,
+                ContentType="image/png"
             )
-            print(f"Storage response: {storage_response}")
+            print(f"File uploaded to S3: {file_name}")
             
-            # Get public URL using admin client
-            public_url = admin_supabase.storage.from_(settings.STORAGE_BUCKET).get_public_url(file_name)
+            # Get public URL
+            public_url = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{file_name}"
             print(f"Public URL: {public_url}")
             
             try:
-                # Log generation using admin client
-                generation_id = str(uuid.uuid4())
-                log_data = {
-                    "id": generation_id,
-                    "user_id": user_id,
-                    "prompt": prompt,
-                    "type": "image",
-                    "url": public_url,
-                    "status": "success",
-                    "created_at": datetime.now().isoformat(),
-                    "updated_at": datetime.now().isoformat()
-                }
-                print(f"Inserting generation data: {log_data}")
-                
-                log_response = admin_supabase.table("generations").insert(log_data).execute()
-                print(f"Generation log response: {log_response}")
+                # Log generation to database
+                generation = Generation(
+                    id=uuid.uuid4(),
+                    user_id=user_id,
+                    prompt=prompt,
+                    type=GenerationType.IMAGE,
+                    url=public_url,
+                    status="success"
+                )
+                db.add(generation)
+                db.commit()
                 
                 return public_url
             except Exception as log_error:
                 print(f"Error logging generation: {str(log_error)}")
+                db.rollback()
                 # Even if logging fails, return the URL if we have it
                 return public_url
                 

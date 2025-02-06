@@ -1,78 +1,37 @@
 # AI Image/Video Generation API
 
-A FastAPI-based backend service for generating images and videos using AI models (DALL-E and RunwayML).
+A FastAPI-based service for generating images and videos using AI models.
 
 ## Features
-
-- User authentication with Supabase
+- User authentication with JWT
 - Image generation using DALL-E
-- Video generation using RunwayML
-- Content storage in Supabase
-- Generation history tracking
-- RESTful API with OpenAPI documentation
+- Video generation using Runway ML
+- Content storage in S3
+- Token-based usage tracking
+- Email verification
 
 ## Prerequisites
-
-- Python 3.8+
-- Supabase account
+- Python 3.11+
+- PostgreSQL database
+- S3-compatible storage
+- Mailjet account
 - OpenAI API key
-- RunwayML API key
+- Runway ML API key
 
-## Project Structure
-
-```
-ImageBuilderBackend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── v1/
-│   │       ├── __init__.py
-│   │       └── endpoints/
-│   │           ├── __init__.py
-│   │           ├── auth.py
-│   │           └── generation.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   └── dependencies.py
-│   ├── db/
-│   │   ├── __init__.py
-│   │   └── session.py
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   ├── auth.py
-│   │   └── generation.py
-│   └── services/
-│       ├── __init__.py
-│       ├── dalle_service.py
-│       └── runway_service.py
-├── scripts/
-│   ├── init_db.py
-│   └── migrations.py
-├── tests/
-│   ├── conftest.py
-│   └── test_auth.py
-├── requirements.txt
-├── .env
-└── README.md
-```
-
-## Setup
-
-### Option 1: Local Setup
+## Installation
 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd ImageBuilderBackend
+cd ImagebuilderBackend
 ```
 
-2. Create and activate virtual environment:
+2. Create a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Linux/Mac
+# or
+.\venv\Scripts\activate  # Windows
 ```
 
 3. Install dependencies:
@@ -80,165 +39,117 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Create `.env` file with your credentials:
+4. Create a `.env` file in the root directory with the following variables:
+
 ```env
-# Supabase Configuration
-SUPABASE_URL=your-supabase-url
-SUPABASE_KEY=your-supabase-key
+# API Settings
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=True
+
+# Database Configuration
+DB_HOST=your-db-host
+DB_PORT=5432
+DB_USER=your-db-user
+DB_PASSWORD=your-db-password
+DB_NAME=your-db-name
 
 # JWT Configuration
 JWT_SECRET=your-jwt-secret
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+ALGORITHM=HS256
+
+# Email Settings (Mailjet)
+MAILJET_API_KEY=your-mailjet-api-key
+MAILJET_SECRET_KEY=your-mailjet-secret-key
+MAIL_FROM=your-sender-email
+MAIL_FROM_NAME=Your Sender Name
+VERIFICATION_TOKEN_EXPIRE_HOURS=24
+FRONTEND_URL=http://localhost:5173
 
 # AI Model Configuration
 AI_MODEL_KEY=your-openai-api-key
 RUNWAY_API_KEY=your-runway-api-key
 
-# Storage Configuration
-STORAGE_BUCKET=images
+# S3 Storage Settings
+S3_ACCESS_KEY=your-s3-access-key
+S3_SECRET_KEY=your-s3-secret-key
+S3_BUCKET_NAME=your-bucket-name
+S3_REGION=your-region
+S3_ENDPOINT=your-s3-endpoint
 
-# Database Configuration
-DB_HOST=your-supabase-host
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=your-database-password
-DB_NAME=postgres
+# CORS Settings
+ALLOWED_ORIGINS=["http://localhost:3000", "http://localhost:8000"]
+
+# Logging
+LOG_LEVEL=INFO
 ```
-
-5. Set up the database:
-```bash
-# Initialize the database with tables and migrations
-python scripts/setup_db.py
-```
-
-### Option 2: Docker Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd ImageBuilderBackend
-```
-
-2. Create `.env` file with your credentials (see Environment Variables section)
-
-3. Build and start the containers:
-```bash
-docker-compose up --build
-```
-
-The API will be available at `http://localhost:8000`
-
-## Running the Application
-
-### Local Development
-```bash
-uvicorn app.main:app --reload
-```
-
-### Docker Production
-```bash
-docker-compose up -d
-```
-
-To view logs:
-```bash
-docker-compose logs -f
-```
-
-To stop the service:
-```bash
-docker-compose down
-```
-
-## API Documentation
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## API Endpoints
-
-### Authentication
-
-- `POST /api/v1/auth/signup` - Register new user
-- `POST /api/v1/auth/login` - User login
-
-### Generation
-
-- `POST /api/v1/generation/generate-image` - Generate image from prompt
-- `POST /api/v1/generation/generate-video` - Generate video from prompt
-- `GET /api/v1/generation/history` - Get user's generation history
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| SUPABASE_URL | Your Supabase project URL |
-| SUPABASE_KEY | Your Supabase API key |
-| JWT_SECRET | Secret key for JWT tokens |
-| AI_MODEL_KEY | OpenAI API key for DALL-E |
-| RUNWAY_API_KEY | RunwayML API key |
-| STORAGE_BUCKET | Supabase storage bucket name |
+| API_HOST | API host address |
+| API_PORT | API port number |
+| DEBUG | Debug mode flag |
+| DB_HOST | Database host address |
+| DB_PORT | Database port |
+| DB_USER | Database username |
+| DB_PASSWORD | Database password |
+| DB_NAME | Database name |
+| JWT_SECRET | Secret key for JWT |
+| ACCESS_TOKEN_EXPIRE_MINUTES | JWT token expiration time |
+| ALGORITHM | JWT algorithm |
+| MAILJET_API_KEY | Mailjet API key |
+| MAILJET_SECRET_KEY | Mailjet secret key |
+| MAIL_FROM | Sender email address |
+| MAIL_FROM_NAME | Sender name |
+| VERIFICATION_TOKEN_EXPIRE_HOURS | Email verification token expiration |
+| FRONTEND_URL | Frontend application URL |
+| AI_MODEL_KEY | OpenAI API key |
+| RUNWAY_API_KEY | Runway ML API key |
+| S3_ACCESS_KEY | S3 access key |
+| S3_SECRET_KEY | S3 secret key |
+| S3_BUCKET_NAME | S3 bucket name |
+| S3_REGION | S3 region |
+| S3_ENDPOINT | S3 endpoint URL |
+| ALLOWED_ORIGINS | CORS allowed origins |
+| LOG_LEVEL | Logging level |
 
-## Error Handling
+## Running with Docker
 
-The API uses standard HTTP status codes:
-- 200: Success
-- 400: Bad Request
-- 401: Unauthorized
-- 403: Forbidden
-- 404: Not Found
-- 500: Internal Server Error
-
-## Security
-
-- JWT-based authentication
-- CORS protection
-- Environment variable configuration
-- Secure password hashing
-- API key protection
-
-## Database Management
-
-### Creating New Migrations
-
-To create a new migration after modifying models:
+1. Build and start the containers:
 ```bash
-alembic revision --autogenerate -m "Description of changes"
+docker-compose up --build -d
 ```
 
-### Applying Migrations
+2. The API will be available at `http://localhost:8000`
 
-To apply all pending migrations:
+## API Documentation
+
+Once the server is running, you can access:
+- Swagger UI documentation at `http://localhost:8000/docs`
+- ReDoc documentation at `http://localhost:8000/redoc`
+
+## Development
+
+1. Run migrations:
 ```bash
 alembic upgrade head
 ```
 
-### Rolling Back Migrations
-
-To roll back the last migration:
+2. Start the development server:
 ```bash
-alembic downgrade -1
+uvicorn app.main:app --reload
 ```
 
-## Docker Commands
+## Testing
 
-### Building the Image
+Run tests with:
 ```bash
-docker build -t image-generation-api .
+pytest
 ```
 
-### Running the Container
-```bash
-docker run -p 8000:8000 --env-file .env image-generation-api
-```
+## License
 
-### Cleaning Up
-```bash
-# Stop all containers
-docker-compose down
-
-# Remove all containers and volumes
-docker-compose down -v
-
-# Remove unused images
-docker system prune -a
-```
+This project is licensed under the MIT License - see the LICENSE file for details.

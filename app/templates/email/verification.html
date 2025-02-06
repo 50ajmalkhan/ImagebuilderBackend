@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email - VidGen</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f9fafb;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #ffffff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            margin-bottom: 20px;
+        }
+        .logo img {
+            width: 200px;
+            height: auto;
+        }
+        .content {
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #1a56db;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .button:hover {
+            background-color: #1e40af;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+        </div>
+        <div class="content">
+            <h2>Welcome to VidGen!</h2>
+            <p>Hi {{ user_name }},</p>
+            <p>Thank you for signing up with VidGen. We're excited to have you on board! To get started, please verify your email address by clicking the button below:</p>
+            
+            <div class="button-container">
+                <a href="{{ verification_url }}" class="button">Verify Email Address</a>
+            </div>
+            
+            <p>This verification link will expire in 24 hours for security reasons.</p>
+            
+            <p>If you didn't create an account with VidGen, you can safely ignore this email.</p>
+            
+            <p>Best regards,<br>The VidGen Team</p>
+        </div>
+        <div class="footer">
+            <p>© 2024 VidGen. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html> 

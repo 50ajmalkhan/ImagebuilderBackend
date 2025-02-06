@@ -2,14 +2,14 @@ from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.api.v1.endpoints import auth, generation
-from app.db.session import engine, supabase
+from app.db.session import engine, s3_client
 import psutil
 import os
 
 settings = get_settings()
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title="VidGen API",
     version=settings.VERSION
 )
 
@@ -29,7 +29,7 @@ app.include_router(generation.router, prefix=f"{settings.API_V1_STR}/generation"
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to AI Image/Video Generation API",
+        "message": "Welcome to VidGen API",
         "version": settings.VERSION,
         "docs_url": "/docs"
     }
@@ -41,7 +41,7 @@ async def health_check():
         "version": settings.VERSION,
         "services": {
             "database": "unhealthy",
-            "supabase": "unhealthy"
+            "storage": "unhealthy"
         },
         "system": {
             "cpu_usage": f"{psutil.cpu_percent()}%",
@@ -59,11 +59,11 @@ async def health_check():
         health_status["services"]["database"] = str(e)
 
     try:
-        # Test Supabase connection
-        supabase.auth.get_user("test")
-    except Exception:
-        # Expected to fail with invalid token, but connection works
-        health_status["services"]["supabase"] = "healthy"
+        # Test S3 connection
+        s3_client.list_objects_v2(Bucket=settings.S3_BUCKET_NAME, MaxKeys=1)
+        health_status["services"]["storage"] = "healthy"
+    except Exception as e:
+        health_status["services"]["storage"] = str(e)
 
     # Overall status
     if all(status == "healthy" for status in health_status["services"].values()):
