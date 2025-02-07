@@ -122,27 +122,6 @@ async def create_subscription(
             detail=f"Failed to process payment: {str(e)}"
         )
 
-@router.post("/create-checkout-session")
-async def create_checkout(
-    data: CreateCheckoutSession,
-    current_user: User = Depends(get_current_user)
-):
-    """Create a Stripe checkout session for token purchase"""
-    try:
-        session_id = await stripe_service.create_checkout_session(
-            user_id=current_user.id,
-            tokens=data.tokens,
-            amount=data.amount
-        )
-        return {"session_id": session_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
 @router.post("/webhook")
 async def stripe_webhook(
     request: Request,

@@ -37,36 +37,4 @@ class StripeService:
                 detail=str(e)
             )
 
-    async def create_checkout_session(self, user_id: int, tokens: int, amount: float) -> str:
-        """Create a Stripe checkout session"""
-        try:
-            session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price_data': {
-                        'currency': 'usd',
-                        'product_data': {
-                            'name': f'{tokens} VidGen Tokens',
-                            'description': f'Purchase {tokens} tokens for video generation'
-                        },
-                        'unit_amount': int(amount * 100)  # Convert to cents
-                    },
-                    'quantity': 1,
-                }],
-                mode='payment',
-                client_reference_id=str(user_id),
-                metadata={
-                    'tokens': str(tokens),
-                    'application_slug': 'vidgen'
-                },
-                success_url=f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{settings.FRONTEND_URL}/payment/cancel"
-            )
-            return session.id
-        except stripe.error.StripeError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
-            )
-
 stripe_service = StripeService() 

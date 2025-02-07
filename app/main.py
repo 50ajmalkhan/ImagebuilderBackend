@@ -1,7 +1,7 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.api.v1.endpoints import auth, generation, token
+from app.api.v1.endpoints import auth, generation, token, subscription
 from app.db.session import engine, s3_client
 import psutil
 import os
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 app.include_router(generation.router, prefix=f"{settings.API_V1_STR}/generation", tags=["Generation"])
 app.include_router(token.router, prefix=f"{settings.API_V1_STR}/tokens", tags=["Tokens"])
+app.include_router(subscription.router, prefix=f"{settings.API_V1_STR}/subscription", tags=["Subscriptions"])
 
 @app.get("/")
 async def root():
